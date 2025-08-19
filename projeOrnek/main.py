@@ -9,8 +9,19 @@ import tkinter as tk
 from tkinter import simpledialog
 from math import sqrt
 
-# Configuration
-CAMERA_INDEX = 0
+# --- CONFIGURATION ---
+
+# --- Video Source ---
+# Use either a local camera index (e.g., 0) or a GStreamer pipeline string.
+# For an Ethernet/IP camera on Raspberry Pi, a GStreamer pipeline is recommended.
+#
+# **IMPORTANT FOR RASPBERRY PI:**
+# Uncomment the line below and replace it with your camera's actual RTSP stream URL.
+# VIDEO_SOURCE = 'rtspsrc location=rtsp://<YOUR_CAMERA_IP>:<PORT>/<STREAM_PATH> ! decodebin ! videoconvert ! appsink'
+#
+# For a standard USB webcam, use its index:
+VIDEO_SOURCE = 'rtspsrc location=rtsp://192.168.144.25:8554/main.264 ! decodebin ! videoconvert ! appsink'
+
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
 OUTPUT_CSV_FILE = 'detections.csv'
@@ -72,12 +83,21 @@ def on_click(event, x, y, flags, param):
 def main():
     """Main function to run the drone vision project."""
     global mode, last_triangle_pos, last_hexagon_pos
-    cap = cv2.VideoCapture(CAMERA_INDEX)
+
+    # --- CAPTURE VIDEO ---
+    # Check if the source is a GStreamer pipeline string
+    if isinstance(VIDEO_SOURCE, str) and 'rtspsrc' in VIDEO_SOURCE.lower():
+        # Use GStreamer backend for RTSP stream
+        cap = cv2.VideoCapture(VIDEO_SOURCE, cv2.CAP_GSTREAMER)
+    else:
+        # Use default backend for local camera index
+        cap = cv2.VideoCapture(VIDEO_SOURCE)
+
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
 
     if not cap.isOpened():
-        print("Error: Could not open camera.")
+        print(f"Error: Could not open video source: {VIDEO_SOURCE}")
         return
 
     triangle_detector = TriangleDetector()
@@ -94,7 +114,7 @@ def main():
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Error: Could not read frame.")
+            print("Error: Could not read frame from video source. Stream might have ended.")
             break
 
         if mode == "detection":
